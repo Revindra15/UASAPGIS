@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Peta Penduduk Kalimantan Selatan 2021</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #map {
+        height: 600px;
+        border-radius: 6px;
+      }
+      .filter {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      input,
+      select,
+      button {
+        padding: 6px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>Peta Jumlah Penduduk Kalimantan Selatan (2021)</h2>
+
+    <div class="filter">
+      <input
+        type="number"
+        id="minPop"
+        placeholder="Minimal penduduk"
+        value="0"
+      />
+      <input type="text" id="searchName" placeholder="Nama wilayah" />
+      <select id="gender">
+        <option value="total">Total</option>
+        <option value="laki">Laki-laki</option>
+        <option value="perempuan">Perempuan</option>
+      </select>
+      <button onclick="applyFilter()">Filter</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+      /*PETA*/
+      const map = L.map("map").setView([-3.1, 115.0], 7);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+
+      const markerLayer = L.layerGroup().addTo(map);
+
+      /*KOORDINAT WILAYAH */
+      const koordinatWilayah = {
+        "TANAH LAUT": [-3.7694, 114.8092],
+        KOTABARU: [-3.2956, 116.1667],
+        BANJAR: [-3.32, 114.9992],
+        "BARITO KUALA": [-3.0719, 114.6453],
+        TAPIN: [-2.9167, 115.05],
+        "HULU SUNGAI SELATAN": [-2.7667, 115.3833],
+        "HULU SUNGAI TENGAH": [-2.6167, 115.4167],
+        "HULU SUNGAI UTARA": [-2.4167, 115.25],
+        TABALONG: [-1.8833, 115.5],
+        "TANAH BUMBU": [-3.4333, 116.0],
+        BALANGAN: [-2.3333, 115.5833],
+        "KOTA BANJARMASIN": [-3.3194, 114.5908],
+        "KOTA BANJAR BARU": [-3.442, 114.832],
+      };
+
+      let dataPenduduk = [];
+
+      /*BACA CSV*/
+      Papa.parse("penduduk_2021.csv", {
+        download: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          console.log("CSV RAW:", results.data);
+
+          // BUANG 4 BARIS HEADER
+          dataPenduduk = results.data.slice(4);
+
+          tampilkanMarker(dataPenduduk);
+        },
+      });
+
+      /*MARKER*/
+      function tampilkanMarker(data) {
+        markerLayer.clearLayers();
+
+        data.forEach((row) => {
+          // row[0] = Kabupaten/Kota
+          // row[1] = Laki-laki
+          // row[2] = Perempuan
+          // row[3] = Total
+
+          if (!row[0]) return;
+
+          let nama = String(row[0])
+            .toUpperCase()
+            .replace("KABUPATEN", "")
+            .replace("KAB.", "")
+            .replace("KOTA", "")
+            .trim();
+
+          if (!koordinatWilayah[nama]) return;
+
+          const laki = parseInt(row[1]);
+          const perempuan = parseInt(row[2]);
+          const total = parseInt(row[3]);
+
+          if (isNaN(laki) || isNaN(perempuan)) return;
+
+          const popup = `
+      <b>${nama}</b><br>
+      👨 Laki-laki: ${laki.toLocaleString()}<br>
+      👩 Perempuan: ${perempuan.toLocaleString()}<br>
+      👥 Total: ${total.toLocaleString()}
+    `;
+
+          L.marker(koordinatWilayah[nama]).bindPopup(popup).addTo(markerLayer);
+        });
+      }
+
+      /*FILTER*/
+      function applyFilter() {
+        const minPop = parseInt(document.getElementById("minPop").value) || 0;
+        const keyword = document
+          .getElementById("searchName")
+          .value.toUpperCase();
+        const gender = document.getElementById("gender").value;
+
+        const filtered = dataPenduduk.filter((row) => {
+          if (!row[0]) return false;
+
+          const nama = row[0].toUpperCase();
+          if (!nama.includes(keyword)) return false;
+
+          const laki = parseInt(row[1]);
+          const perempuan = parseInt(row[2]);
+          const total = parseInt(row[3]);
+
+          let nilai = total;
+          if (gender === "laki") nilai = laki;
+          if (gender === "perempuan") nilai = perempuan;
+
+          return nilai >= minPop;
+        });
+
+        tampilkanMarker(filtered);
+      }
+    </script>
+  </body>
+</html>
